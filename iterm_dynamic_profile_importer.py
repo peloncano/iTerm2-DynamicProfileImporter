@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 """ iTerm2 2.9.20140923 and later allows for the creation of Dynamic Profiles.
-	
+
 	I have a list of hosts that I would normally SSH into. This script was written to allow for simple creation of dynamic Profiles
 	in iTerm2 for those individual hosts.
 
@@ -11,8 +11,7 @@
 import argparse
 import json
 import os.path
-import csv
-from os.path import expanduser
+import csv, sys, json
 
 # script options
 parser = argparse.ArgumentParser(prog="SCRIPT", description="This script will allow you to automatically create dynamic profiles for iTerm2 version 2.9.20140923 or later.")
@@ -24,6 +23,7 @@ parser.add_argument("-r", "--replace", dest="isReplace", action="store_true", de
 parser.add_argument("-t", "--tags", dest="tags", nargs="+", default=[], help="Tag(s) to apply to the profile.")
 parser.add_argument("-l", "--hosts", dest="hosts", nargs="+", help="List of host names or IP addresses")
 parser.add_argument("-c", "--command", dest="command", default="ssh {host}", help="The custom SSH command to run. The host name should be entered as '{host}'")
+parser.add_argument("-a", "--attributes", dest="customAttributes", default="{}", help="You can specify extra attributes to be added to the profile in JSON. (e.g. \"{\"Badge Text\": \"{host}\"}\")")
 
 args = parser.parse_args()
 
@@ -43,14 +43,18 @@ replaceProfiles 	= args.isReplace
 allProfileEntries	= []
 profileData = {};
 
-fileExists = os.path.exists(dynamicProfLocation) 
+fileExists = os.path.exists(dynamicProfLocation)
 
 if os.path.exists(iTermDynamicProfilesLoc) == False:
 	raise RuntimeError("Missing iTerm2 Dynamic Profiles directory: " + iTermDynamicProfilesLoc + ". Make sure you have installed iTerm2 version 2.9.20140923 or later")
 
 if fileExists:
 	with open(dynamicProfLocation) as data_file:
-		profileData = json.load(data_file)
+		try:
+			profileData = json.load(data_file)
+		except:
+			print("WARNING - Unexpected error loading json data from file %s " % (args.filename), sys.exc_info()[0])
+			profileData = emptyProfileData
 else:
 	profileData = emptyProfileData
 
@@ -64,18 +68,31 @@ else:
 	pass
 
 def getProfile(hostname, tags, command):
-	""" Returns a profile dictionary. 
+	""" Returns a profile dictionary.
 
 		This can be expanded to include other attributes allowed in the iTerm plist
 	"""
 
-	return {
+	defaultAttributesDic = {
        "Name": hostname,
        "Guid": hostname,
        "Custom Command" : "Yes",
        "Tags": tags,
        "Command" : command.replace("{host}", hostname)
 	}
+
+	customAttributesDic = {}
+	try:
+		# From the json string replace {host} with the actual hostname
+		customAttributes = args.customAttributes.replace("{host}", hostname)
+		# Try to load decode the JSON string
+		customAttributesDic = json.loads(customAttributes)
+	except:
+		print("Unexpected error:", sys.exc_info()[0])
+
+	# Merge the customAttributes with the default attributes
+	defaultAttributesDic.update(customAttributesDic)
+	return defaultAttributesDic
 
 if args.csvImport != None:
 
@@ -86,7 +103,7 @@ if args.csvImport != None:
 			host = row[0]
 
 			tags = []
-			
+
 			if len(row) >= 2:
 				# If the CSV has a second column, merge it with the tags argument values that were passed in
 				# and then use that for the profile's tag
@@ -106,4 +123,3 @@ profileData['Profiles'] = allProfileEntries
 
 with open(dynamicProfLocation, 'w') as f:
 	f.write(unicode(json.dumps(profileData, ensure_ascii=False)))
-

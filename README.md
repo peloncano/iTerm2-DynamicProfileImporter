@@ -43,6 +43,9 @@ optional arguments:
   -c COMMAND, --command COMMAND
                         The custom SSH command to run. The host name should be
                         entered as '{host}'
+  -a CUSTOMATTRIBUTES, --attributes CUSTOMATTRIBUTES
+                        You can specify extra attributes to be added to the
+                        profile in JSON. (e.g. "{"Badge Text": "{host}"}")
 ```
 
 The only required arguments are `-i` and `-l`
